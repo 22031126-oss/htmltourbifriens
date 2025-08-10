@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parada Inteligente - Rutas de Transporte</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <style>
+    :root {
+      --primary: #2c3e50;
+      --primary-light: #3d566e;
+      --secondary: #3498db;
+      --secondary-light: #5dade2;
+      --accent: #e74c3c;
+      --light: #ecf0f1;
+      --dark: #2c3e50;
+      --dark-light: #34495e;
+      --success: #27ae60;
+      --warning: #f39c12;
+      --danger: #e74c3c;
+      --info: #2980b9;
+      --gray: #95a5a6;
+      --white: #ffffff;
+      --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --transition: all 0.3s ease;
+    }
+   
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+   
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--dark);
+      line-height: 1.6;
+    }
+   
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: var(--white);
+      padding: 1.2rem;
+      text-align: center;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+   
+    .header h1 {
+      font-size: 1.5rem;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+   
+    .time-display {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+   
+    /* Menú de navegación */
+    .nav-tabs {
+      display: flex;
+      background: var(--white);
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 80px;
+      z-index: 90;
+    }
+    
+    .nav-tab {
+      flex: 1;
+      text-align: center;
+      padding: 1rem 0;
+      font-weight: 600;
+      color: var(--dark-light);
+      cursor: pointer;
+      transition: var(--transition);
+      border-bottom: 3px solid transparent;
+    }
+    
+    .nav-tab.active {
+      color: var(--secondary);
+      border-bottom: 3px solid var(--secondary);
+    }
+    
+    .nav-tab i {
+      margin-right: 5px;
+    }
+    
+    /* Contenido de las pestañas */
+    .tab-content {
+      display: none;
+      padding: 1rem;
+      animation: fadeIn 0.5s ease;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* Estilos para el mapa */
+    #map-container {
+      margin: 1rem 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      height: 300px;
+    }
+    
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    
+    /* Mini mapa para cada ruta */
+    .ruta-mapa-container {
+      margin: 1rem 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      height: 180px;
+      position: relative;
+    }
+    
+    .ruta-mapa {
+      height: 100%;
+      width: 100%;
+    }
+    
+    .mapa-leyenda {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.9);
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.7rem;
+      z-index: 1000;
+    }
+    
+    .mapa-leyenda i {
+      margin-right: 5px;
+    }
+    
+    /* Estilos para las rutas */
+    .segmento {
+      margin-bottom: 1.5rem;
+      background: var(--white);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      animation: slideIn 0.4s ease forwards;
+    }
+   
+    .segmento-header {
+      background: var(--secondary);
+      color: white;
+      padding: 0.8rem 1rem;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+   
+    .segmento-header i {
+      font-size: 1.2rem;
+    }
+   
+    .ruta-info {
+      padding: 1rem;
+    }
+   
+    .ruta-estado {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 8px;
+      background: rgba(255,255,255,0.2);
+    }
+   
+    .tiempo-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding: 0.8rem;
+      background: rgba(52, 152, 219, 0.1);
+      border-radius: 8px;
+    }
+   
+    .tiempo {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--dark-light);
+    }
+   
+    .tiempo-valor {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--secondary);
+    }
+   
+    .progreso-container {
+      height: 8px;
+      background: #eee;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 0.5rem 0;
+    }
+   
+    .progreso {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.5s ease;
+      background: linear-gradient(90deg, var(--secondary) 0%, var(--secondary-light) 100%);
+    }
+   
+    .paradas-container {
+      margin: 1rem 0;
+    }
+   
+    .parada-item {
+      padding: 0.8rem 0;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      font-size: 0.9rem;
+      transition: var(--transition);
+    }
+   
+    .parada-item:last-child {
+      border-bottom: none;
+    }
+   
+    .parada-item::before {
+      content: '•';
+      margin-right: 10px;
+      font-size: 1.2rem;
+      color: var(--secondary);
+    }
+   
+    .parada-item.actual {
+      font-weight: 600;
+      color: var(--primary);
+      background: rgba(52, 152, 219, 0.05);
+    }
+   
+    .parada-item.actual::before {
+      color: var(--success);
+      content: '➤';
+    }
+   
+    .notificacion {
+      background: rgba(46, 204, 113, 0.1);
+      color: var(--success);
+      padding: 0.8rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: fadeInOut 2s ease-in-out infinite;
+    }
+   
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0.9; }
+      50% { opacity: 1; }
+    }
+   
+    .ruta-detalle {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1rem;
+      font-size: 0.8rem;
+      color: var(--gray);
+    }
+   
+    .ruta-detalle span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    /* Notificación estilo Uber */
+    .uber-notification {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--white);
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      z-index: 1000;
+      width: 90%;
+      max-width: 400px;
+      display: none;
+      animation: slideUp 0.5s ease forwards;
+    }
+    
+    @keyframes slideUp {
+      from { bottom: -100px; opacity: 0; }
+      to { bottom: 20px; opacity: 1; }
+    }
+    
+    .uber-notification-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .uber-notification-header h4 {
+      color: var(--primary);
+      margin: 0;
+    }
+    
+    .uber-notification-close {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      color: var(--gray);
+      cursor: pointer;
+    }
+    
+    .uber-notification-body {
+      font-size: 0.9rem;
+      color: var(--dark-light);
+    }
+    
+    /* Formularios para quejas y sugerencias */
+    .form-container {
+      background: var(--white);
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--dark-light);
+    }
+    
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: 'Montserrat', sans-serif;
+      transition: var(--transition);
+    }
+    
+    .form-group textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    
+    .btn {
+      background: var(--secondary);
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn:hover {
+      background: var(--secondary-light);
+    }
+    
+    .btn-block {
+      display: block;
+      width: 100%;
+    }
+    
+    /* Ajustes */
+    .settings-item {
+      background: var(--white);
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .settings-item .toggle {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .settings-item .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .settings-item .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .settings-item .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    .settings-item input:checked + .slider {
+      background-color: var(--secondary);
+    }
+    
+    .settings-item input:focus + .slider {
+      box-shadow: 0 0 1px var(--secondary);
+    }
+    
+    .settings-item input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    
+    /* Animaciones */
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .segmento:nth-child(1) { animation-delay: 0.1s; }
+    .segmento:nth-child(2) { animation-delay: 0.2s; }
+    .segmento:nth-child(3) { animation-delay: 0.3s; }
+    .segmento:nth-child(4) { animation-delay: 0.4s; }
+    .segmento:nth-child(5) { animation-delay: 0.5s; }
+    .segmento:nth-child(6) { animation-delay: 0.6s; }
+    .segmento:nth-child(7) { animation-delay: 0.7s; }
+    .segmento:nth-child(8) { animation-delay: 0.8s; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Parada Inteligente</h1>
+    <div class="time-display">
+      <i class="far fa-clock"></i>
+      <span id="hora-actual">--:-- --</span>
+    </div>
+  </div>
+  
+  <!-- Menú de navegación -->
+  <div class="nav-tabs">
+    <div class="nav-tab active" data-tab="rutas">
+      <i class="fas fa-bus"></i> Rutas
+    </div>
+    <div class="nav-tab" data-tab="mapa">
+      <i class="fas fa-map-marked-alt"></i> Mapa
+    </div>
+    <div class="nav-tab" data-tab="quejas">
+      <i class="fas fa-comment-alt"></i> Quejas
+    </div>
+    <div class="nav-tab" data-tab="ajustes">
+      <i class="fas fa-cog"></i> Ajustes
+    </div>
+  </div>
+  
+  <!-- Contenido de las pestañas -->
+  
+  <!-- Pestaña de Rutas -->
+  <div class="tab-content active" id="rutas-tab">
+    <div class="segmentos-container">
+      <!-- Segmento Ruta 1 -->
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Ruta 1 <span class="ruta-estado">Activa</span></span>
+          <i class="fas fa-bus"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="tiempo-container">
+            <span class="tiempo">Próximo autobús:</span>
+            <span class="tiempo-valor">5 min</span>
+          </div>
+          <div class="progreso-container">
+            <div class="progreso" style="width: 70%;"></div>
+          </div>
+          
+          <!-- Mini mapa para la ruta -->
+          <div class="ruta-mapa-container">
+            <div id="ruta1-mapa" class="ruta-mapa"></div>
+            <div class="mapa-leyenda">
+              <i class="fas fa-bus" style="color: #3498db;"></i> Autobús
+              <i class="fas fa-map-marker-alt" style="color: #e74c3c; margin-left: 10px;"></i> Parada
+            </div>
+          </div>
+         
+          <div class="paradas-container">
+            <div class="parada-item">Centro Comercial</div>
+            <div class="parada-item">Plaza Principal</div>
+            <div class="parada-item actual">Mercado Central</div>
+            <div class="parada-item">Terminal Norte</div>
+            <div class="parada-item">Colonia Jardines</div>
+          </div>
+         
+          <div class="ruta-detalle">
+            <span><i class="far fa-clock"></i> Frecuencia: 10-15 min</span>
+            <span><i class="fas fa-calendar-alt"></i> Horario: 5:30 AM - 10:30 PM</span>
+          </div>
+        </div>
+      </div>
+     
+      <!-- Segmento Ruta 2 -->
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Ruta 2 <span class="ruta-estado">Activa</span></span>
+          <i class="fas fa-bus"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="tiempo-container">
+            <span class="tiempo">Próximo autobús:</span>
+            <span class="tiempo-valor">8 min</span>
+          </div>
+          <div class="progreso-container">
+            <div class="progreso" style="width: 50%;"></div>
+          </div>
+          
+          <!-- Mini mapa para la ruta -->
+          <div class="ruta-mapa-container">
+            <div id="ruta2-mapa" class="ruta-mapa"></div>
+            <div class="mapa-leyenda">
+              <i class="fas fa-bus" style="color: #3498db;"></i> Autobús
+              <i class="fas fa-map-marker-alt" style="color: #e74c3c; margin-left: 10px;"></i> Parada
+            </div>
+          </div>
+         
+          <div class="paradas-container">
+            <div class="parada-item">Zona Industrial</div>
+            <div class="parada-item actual">Plaza Sendero</div>
+            <div class="parada-item">FOVISSSTE 1</div>
+            <div class="parada-item">FOVISSSTE 2</div>
+            <div class="parada-item">FOVISSSTE 3</div>
+          </div>
+         
+          <div class="ruta-detalle">
+            <span><i class="far fa-clock"></i> Frecuencia: 12-18 min</span>
+            <span><i class="fas fa-calendar-alt"></i> Horario: 6:00 AM - 9:30 PM</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pestaña de Mapa -->
+  <div class="tab-content" id="mapa-tab">
+    <div class="segmentos-container">
+      <div class="form-container">
+        <div class="form-group">
+          <label for="buscar-ruta">Buscar ruta o parada</label>
+          <input type="text" id="buscar-ruta" placeholder="Escribe el nombre de la ruta o parada">
+        </div>
+      </div>
+      
+      <div id="map-container">
+        <div id="map"></div>
+      </div>
+      
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Leyenda del Mapa</span>
+          <i class="fas fa-map-pin"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="paradas-container">
+            <div class="parada-item"><i class="fas fa-bus" style="color: #3498db;"></i> Autobús en movimiento</div>
+            <div class="parada-item"><i class="fas fa-map-marker-alt" style="color: #e74c3c;"></i> Parada de autobús</div>
+            <div class="parada-item"><i class="fas fa-circle" style="color: #27ae60;"></i> Tú ubicación actual</div>
+            <div class="parada-item"><i class="fas fa-route" style="color: #9b59b6;"></i> Ruta del autobús</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pestaña de Quejas y Sugerencias -->
+  <div class="tab-content" id="quejas-tab">
+    <div class="segmentos-container">
+      <div class="form-container">
+        <h3 style="margin-bottom: 1rem; color: var(--primary);">Reportar problema o sugerencia</h3>
+        
+        <div class="form-group">
+          <label for="tipo-reporte">Tipo de reporte</label>
+          <select id="tipo-reporte">
+            <option value="">Selecciona una opción</option>
+            <option value="queja">Queja</option>
+            <option value="sugerencia">Sugerencia</option>
+            <option value="problema">Reportar problema</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="ruta-reporte">Ruta relacionada (opcional)</label>
+          <select id="ruta-reporte">
+            <option value="">Selecciona una ruta</option>
+            <option value="ruta1">Ruta 1</option>
+            <option value="ruta2">Ruta 2</option>
+            <option value="ruta3">Ruta 3</option>
+            <option value="ruta4">Ruta 4</option>
+            <option value="ruta5">Ruta 5</option>
+            <option value="circuito1">Circuito 1</option>
+            <option value="circuito2">Circuito 2</option>
+            <option value="sanjuan">San Juan</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="descripcion-reporte">Descripción</label>
+          <textarea id="descripcion-reporte" placeholder="Describe tu queja, sugerencia o problema con detalle"></textarea>
+        </div>
+        
+        <button class="btn btn-block">
+          <i class="fas fa-paper-plane"></i> Enviar reporte
+        </button>
+      </div>
+      
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Reportes recientes</span>
+          <i class="fas fa-history"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="paradas-container">
+            <div class="parada-item">
+              <strong>Retraso en Ruta 2</strong><br>
+              <small>Enviado hoy a las 08:45 AM</small><br>
+              <span style="color: var(--gray);">El autobús llegó 20 minutos tarde a la parada Plaza Sendero</span>
+            </div>
+            <div class="parada-item">
+              <strong>Sugerencia para Ruta 1</strong><br>
+              <small>Enviado ayer a las 05:30 PM</small><br>
+              <span style="color: var(--gray);">Sería bueno aumentar la frecuencia en horas pico</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pestaña de Ajustes -->
+  <div class="tab-content" id="ajustes-tab">
+    <div class="segmentos-container">
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Preferencias</span>
+          <i class="fas fa-sliders-h"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="settings-item">
+            <span><i class="fas fa-bell" style="margin-right: 8px;"></i> Notificaciones</span>
+            <label class="toggle">
+              <input type="checkbox" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          
+          <div class="settings-item">
+            <span><i class="fas fa-map-marker-alt" style="margin-right: 8px;"></i> Compartir ubicación</span>
+            <label class="toggle">
+              <input type="checkbox" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          
+          <div class="settings-item">
+            <span><i class="fas fa-moon" style="margin-right: 8px;"></i> Modo oscuro</span>
+            <label class="toggle">
+              <input type="checkbox">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="segmento">
+        <div class="segmento-header">
+          <span>Información</span>
+          <i class="fas fa-info-circle"></i>
+        </div>
+        <div class="ruta-info">
+          <div class="paradas-container">
+            <div class="parada-item">
+              <strong>Versión</strong>
+              <span style="float: right;">1.2.0</span>
+            </div>
+            <div class="parada-item">
+              <strong>Última actualización</strong>
+              <span style="float: right;">10/08/2023</span>
+            </div>
+            <div class="parada-item">
+              <strong>Desarrollador</strong>
+              <span style="float: right;">Transporte Inteligente S.A.</span>
+            </div>
+          </div>
+          
+          <button class="btn btn-block" style="margin-top: 1rem; background: var(--gray);">
+            <i class="fas fa-question-circle"></i> Ayuda y soporte
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notificación estilo Uber -->
+  <div class="uber-notification" id="uber-notification">
+    <div class="uber-notification-header">
+      <h4>¡Tu autobús está llegando!</h4>
+      <button class="uber-notification-close" id="close-notification">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="uber-notification-body">
+      El autobús de la Ruta 1 está a 2 minutos de la parada Mercado Central.
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script>
+    // Actualizar hora
+    function updateTime() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const hours12 = hours % 12 || 12;
+     
+      document.getElementById('hora-actual').textContent = `${hours12}:${minutes} ${ampm}`;
+    }
+    
+    // Inicializar los mapas
+    function initMaps() {
+      // Coordenadas de Silao, Guanajuato
+      const silaoCoords = [20.9437, -101.4270];
+      
+      // Mapa principal
+      const mainMap = L.map('map').setView(silaoCoords, 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(mainMap);
+      
+      // Marcador de ejemplo para una parada de autobús en Silao
+      L.marker(silaoCoords).addTo(mainMap)
+        .bindPopup('Parada Principal Silao<br>Rutas: 1, 2, 3')
+        .openPopup();
+      
+      // Mini mapa para Ruta 1 - Silao
+      const ruta1Map = L.map('ruta1-mapa').setView(silaoCoords, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(ruta1Map);
+      
+      // Marcadores y ruta para Ruta 1 en Silao
+      const ruta1Paradas = [
+        [20.9537, -101.4370], // Centro Comercial
+        [20.9487, -101.4320], // Plaza Principal
+        [20.9437, -101.4270], // Mercado Central (actual)
+        [20.9387, -101.4220], // Terminal Norte
+        [20.9337, -101.4170]  // Colonia Jardines
+      ];
+      
+      // Dibujar ruta con colores segmentados (verde/naranja/rojo)
+      L.polyline([ruta1Paradas[0], ruta1Paradas[1]], {color: '#27ae60', weight: 4}).addTo(ruta1Map); // Verde
+      L.polyline([ruta1Paradas[1], ruta1Paradas[2]], {color: '#f39c12', weight: 4}).addTo(ruta1Map); // Naranja
+      L.polyline([ruta1Paradas[2], ruta1Paradas[3]], {color: '#e74c3c', weight: 4}).addTo(ruta1Map); // Rojo
+      L.polyline([ruta1Paradas[3], ruta1Paradas[4]], {color: '#e74c3c', weight: 4}).addTo(ruta1Map); // Rojo
+      
+      // Añadir marcadores de paradas
+      ruta1Paradas.forEach((parada, index) => {
+        const popupText = index === 0 ? 'Centro Comercial' : 
+                          index === 1 ? 'Plaza Principal' : 
+                          index === 2 ? 'Mercado Central' : 
+                          index === 3 ? 'Terminal Norte' : 'Colonia Jardines';
+        
+        L.marker(parada, {
+          icon: L.divIcon({
+            className: 'parada-marker',
+            html: `<i class="fas fa-map-marker-alt" style="color: ${index === 2 ? '#27ae60' : '#e74c3c'}; font-size: 24px;"></i>`,
+            iconSize: [24, 24]
+          })
+        }).addTo(ruta1Map)
+          .bindPopup(popupText);
+      });
+      
+      // Añadir marcador de autobús (posición actual) con contador de usuarios
+      const busMarkerRuta1 = L.marker([20.9460, -101.4290], {
+        icon: L.divIcon({
+          className: 'bus-marker',
+          html: `<div style="position:relative;">
+                  <i class="fas fa-bus" style="color: #3498db; font-size: 24px;"></i>
+                  <span style="position:absolute; top:-8px; right:-8px; background:#e74c3c; color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">12</span>
+                </div>`,
+          iconSize: [24, 24]
+        })
+      }).addTo(ruta1Map)
+        .bindPopup('Autobús Ruta 1<br>Pasajeros: 12');
+      
+      // Ajustar el zoom para que se vea toda la ruta
+      ruta1Map.fitBounds(ruta1Paradas);
+      
+      // Mini mapa para Ruta 2 - Silao
+      const ruta2Map = L.map('ruta2-mapa').setView(silaoCoords, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(ruta2Map);
+      
+      // Marcadores y ruta para Ruta 2 en Silao
+      const ruta2Paradas = [
+        [20.9637, -101.4470], // Zona Industrial
+        [20.9537, -101.4370], // Plaza Sendero (actual)
+        [20.9437, -101.4270], // FOVISSSTE 1
+        [20.9337, -101.4170], // FOVISSSTE 2
+        [20.9237, -101.4070]  // FOVISSSTE 3
+      ];
+      
+      // Dibujar ruta con colores segmentados (verde/naranja/rojo)
+      L.polyline([ruta2Paradas[0], ruta2Paradas[1]], {color: '#27ae60', weight: 4}).addTo(ruta2Map); // Verde
+      L.polyline([ruta2Paradas[1], ruta2Paradas[2]], {color: '#f39c12', weight: 4}).addTo(ruta2Map); // Naranja
+      L.polyline([ruta2Paradas[2], ruta2Paradas[3]], {color: '#e74c3c', weight: 4}).addTo(ruta2Map); // Rojo
+      L.polyline([ruta2Paradas[3], ruta2Paradas[4]], {color: '#e74c3c', weight: 4}).addTo(ruta2Map); // Rojo
+      
+      // Añadir marcadores de paradas
+      ruta2Paradas.forEach((parada, index) => {
+        const popupText = index === 0 ? 'Zona Industrial' : 
+                          index === 1 ? 'Plaza Sendero' : 
+                          index === 2 ? 'FOVISSSTE 1' : 
+                          index === 3 ? 'FOVISSSTE 2' : 'FOVISSSTE 3';
+        
+        L.marker(parada, {
+          icon: L.divIcon({
+            className: 'parada-marker',
+            html: `<i class="fas fa-map-marker-alt" style="color: ${index === 1 ? '#27ae60' : '#e74c3c'}; font-size: 24px;"></i>`,
+            iconSize: [24, 24]
+          })
+        }).addTo(ruta2Map)
+          .bindPopup(popupText);
+      });
+      
+      // Añadir marcador de autobús (posición actual) con contador de usuarios
+      const busMarkerRuta2 = L.marker([20.9500, -101.4320], {
+        icon: L.divIcon({
+          className: 'bus-marker',
+          html: `<div style="position:relative;">
+                  <i class="fas fa-bus" style="color: #3498db; font-size: 24px;"></i>
+                  <span style="position:absolute; top:-8px; right:-8px; background:#e74c3c; color:white; border-radius:50%; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">8</span>
+                </div>`,
+          iconSize: [24, 24]
+        })
+      }).addTo(ruta2Map)
+        .bindPopup('Autobús Ruta 2<br>Pasajeros: 8');
+      
+      // Ajustar el zoom para que se vea toda la ruta
+      ruta2Map.fitBounds(ruta2Paradas);
+    }
+    
+    // Mostrar notificación estilo Uber
+    function showUberNotification(ruta, tiempo, parada) {
+      const notification = document.getElementById('uber-notification');
+      notification.querySelector('h4').textContent = `¡Tu autobús está llegando!`;
+      notification.querySelector('.uber-notification-body').textContent = 
+        `El autobús de la ${ruta} está a ${tiempo} de la parada ${parada}.`;
+      
+      notification.style.display = 'block';
+      
+      // Ocultar después de 10 segundos
+      setTimeout(() => {
+        notification.style.display = 'none';
+      }, 10000);
+    }
+    
+    // Cerrar notificación
+    document.getElementById('close-notification').addEventListener('click', function() {
+      document.getElementById('uber-notification').style.display = 'none';
+    });
+    
+    // Cambio de pestañas
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        // Remover clase active de todas las pestañas
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Agregar clase active a la pestaña seleccionada
+        this.classList.add('active');
+        const tabId = this.getAttribute('data-tab') + '-tab';
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+    
+    // Simular llegada de autobús (para demo)
+    setTimeout(() => {
+      showUberNotification('Ruta 1', '2 minutos', 'Mercado Central');
+    }, 3000);
+    
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', function() {
+      updateTime();
+      setInterval(updateTime, 60000); // Actualizar cada minuto
+      initMaps();
+    });
+  </script>
+</body>
+</html>
